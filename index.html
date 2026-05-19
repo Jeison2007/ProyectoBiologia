@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reforestación de un bosque</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <style>
+        /* Estilos base copiados de tu imagen */
+        body {
+            background-color: #1a1a1a;
+            color: #d3d3d3;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        h2 { text-align: center; font-size: 22px; color: white; margin-bottom: 30px;}
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; }
+        .form-group input[type="text"] {
+            background-color: #2a2a2a;
+            border: 1px solid #555;
+            color: gray;
+            padding: 8px;
+            width: 90%;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #1a1a1a;
+            color: white;
+            border: 2px solid #555;
+            border-radius: 6px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        button:hover { border-color: white; }
+    </style>
+</head>
+<body>
+
+    <h2>Reforestación de un<br>bosque despues de un<br>incendio</h2>
+
+    <div style="margin-bottom: 25px;">
+        <p style="font-weight: bold; font-size: 18px; color: white;">Continuar con:</p>
+        <input type="radio" id="radio-propios" name="origen" value="propios">
+        <label for="radio-propios" style="font-size: 16px;">Datos propios</label><br>
+        
+        <input type="radio" id="radio-prueba" name="origen" value="prueba" checked>
+        <label for="radio-prueba" style="font-size: 16px;">Datos de prueba</label>
+    </div>
+
+    <div id="menu-propios" style="display: none;">
+        <p style="font-weight: bold; font-size: 18px; color: white;">
+            Digite los datos para<br>alimentar una tabla 6 x 6,<br>separe los valores con comas
+        </p>
+        
+        <div class="form-group">
+            <label>Frutos iniciales</label>
+            <input type="text" id="in-f-ini" placeholder="Datos separados por">
+        </div>
+        <div class="form-group">
+            <label>Frutos comidos</label>
+            <input type="text" id="in-f-com" placeholder="Datos separados por">
+        </div>
+        <div class="form-group">
+            <label>Semillas por fruto</label>
+            <input type="text" id="in-sxf" placeholder="Datos separados por">
+        </div>
+        <div class="form-group">
+            <label>% Semillas comidas por ratón</label>
+            <input type="text" id="in-raton" placeholder="Datos separados por">
+        </div>
+        <div class="form-group">
+            <label>% Semillas que germinan</label>
+            <input type="text" id="in-germinan" placeholder="Datos separados por">
+        </div>
+        <div class="form-group">
+            <label>% Plantulas que sobreviven</label>
+            <input type="text" id="in-plantulas" placeholder="Datos separados por">
+        </div>
+        <button id="btn-generar">Generar Tabla</button>
+    </div>
+
+    <div id="contenedor-tabla">
+        <p style="font-weight: bold; font-size: 18px; color: white;">Tabla de datos</p>
+        <table style="border: 1px solid #777; border-collapse: collapse; text-align: center; width: 100%; font-size: 14px; margin-bottom: 20px;">
+            <thead>
+                <tr style="background-color: #222;">
+                    <th style="border: 1px solid #777; padding: 8px;">F.<br>iniciales</th>
+                    <th style="border: 1px solid #777;">F.<br>comidos</th>
+                    <th style="border: 1px solid #777;">S<br>x<br>F</th>
+                    <th style="border: 1px solid #777;">S.<br>Raton</th>
+                    <th style="border: 1px solid #777;">S.<br>Germinan</th>
+                    <th style="border: 1px solid #777;">Plantulas<br>S</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpo-tabla">
+                </tbody>
+        </table>
+    </div>
+
+    <div id="contenedor-simulacion" style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+        <input type="text" id="inputFila" value="01" style="background-color: #2a2a2a; color: white; border: 1px solid #555; padding: 10px; width: 60px; text-align: left; border-radius: 4px;">
+        <button id="btn-tirada">Realizar tirada(s)</button>
+    </div>
+
+    <div id="resultadoTirada" style="border: 1px solid white; border-radius: 8px; padding: 15px; display: none; margin-bottom: 20px;"></div>
+
+    <div id="estadisticas" style="border: 1px solid white; border-radius: 8px; padding: 15px; display: none;"></div>
+
+
+    <script type="py">
+        from pyscript import document
+        import random
+        import math
+        import statistics
+
+        # 1. Datos de prueba quemados (Imagen 2)
+        datos_prueba = {
+            'f_ini': [8, 10, 12, 14, 9, 11],
+            'f_com': [6, 6, 2, 1, 3, 1],
+            'sxf': [7, 4, 9, 10, 7, 8],
+            'raton': [80, 50, 30, 50, 40, 20],
+            'germinan': [20, 60, 20, 50, 20, 90],
+            'plantulas': [60, 60, 50, 40, 10, 80]
+        }
+        # Variable que guarda los datos activos (ya sean de prueba o propios)
+        datos_actuales = datos_prueba.copy()
+
+        # 2. Función para pintar la tabla en HTML
+        def renderizar_tabla():
+            html_rows = ""
+            for i in range(6):
+                html_rows += f"""
+                <tr>
+                    <td style="border: 1px solid #777; padding: 8px;">{datos_actuales['f_ini'][i]}</td>
+                    <td style="border: 1px solid #777;">{datos_actuales['f_com'][i]}</td>
+                    <td style="border: 1px solid #777;">{datos_actuales['sxf'][i]}</td>
+                    <td style="border: 1px solid #777;">{datos_actuales['raton'][i]}</td>
+                    <td style="border: 1px solid #777;">{datos_actuales['germinan'][i]}</td>
+                    <td style="border: 1px solid #777;">{datos_actuales['plantulas'][i]}</td>
+                </tr>
+                """
+            document.querySelector("#cuerpo-tabla").innerHTML = html_rows
+
+        # 3. Función para cambiar entre modos del menú (Radio Buttons)
+        def alternar_menu(event=None):
+            es_propios = document.querySelector("#radio-propios").checked
+            
+            if es_propios:
+                document.querySelector("#menu-propios").style.display = "block"
+                document.querySelector("#contenedor-tabla").style.display = "none"
+                document.querySelector("#contenedor-simulacion").style.display = "none"
+                document.querySelector("#resultadoTirada").style.display = "none"
+                document.querySelector("#estadisticas").style.display = "none"
+            else:
+                document.querySelector("#menu-propios").style.display = "none"
+                document.querySelector("#contenedor-tabla").style.display = "block"
+                document.querySelector("#contenedor-simulacion").style.display = "flex"
+                
+                # Restaurar los datos de prueba
+                global datos_actuales
+                datos_actuales = datos_prueba.copy()
+                renderizar_tabla()
+
+        # 4. Función para leer comas y crear tabla personalizada
+        def generar_tabla_propios(event):
+            try:
+                # Extraemos y limpiamos los textos de los inputs, convirtiéndolos en listas de enteros
+                d1 = [int(x.strip()) for x in document.querySelector("#in-f-ini").value.split(",")]
+                d2 = [int(x.strip()) for x in document.querySelector("#in-f-com").value.split(",")]
+                d3 = [int(x.strip()) for x in document.querySelector("#in-sxf").value.split(",")]
+                d4 = [int(x.strip()) for x in document.querySelector("#in-raton").value.split(",")]
+                d5 = [int(x.strip()) for x in document.querySelector("#in-germinan").value.split(",")]
+                d6 = [int(x.strip()) for x in document.querySelector("#in-plantulas").value.split(",")]
+                
+                global datos_actuales
+                datos_actuales = {
+                    'f_ini': d1, 'f_com': d2, 'sxf': d3, 'raton': d4, 'germinan': d5, 'plantulas': d6
+                }
+                
+                # Ocultamos el formulario y mostramos la tabla nueva
+                document.querySelector("#menu-propios").style.display = "none"
+                document.querySelector("#contenedor-tabla").style.display = "block"
+                document.querySelector("#contenedor-simulacion").style.display = "flex"
+                
+                renderizar_tabla()
+            except Exception as e:
+                print("Asegúrate de ingresar 6 números separados por comas en todas las casillas.")
+
+        # 5. Función de simulación aleatoria independiente
+        def realizar_tiradas(event):
+            num_tiradas = int(document.querySelector("#inputFila").value)
+            resultados_sobreviven = []
+            texto_detalle = ""
+            
+            for i in range(num_tiradas):
+                # .choice() elige un elemento al azar de la lista. 
+                # Al hacerlo línea por línea, mezclamos datos de diferentes filas!
+                f_ini = random.choice(datos_actuales['f_ini'])
+                f_com = random.choice(datos_actuales['f_com'])
+                sxf = random.choice(datos_actuales['sxf'])
+                pct_raton = random.choice(datos_actuales['raton'])
+                pct_germ = random.choice(datos_actuales['germinan'])
+                pct_plant = random.choice(datos_actuales['plantulas'])
+                
+                # Fórmulas matemáticas
+                f_fin = f_ini - f_com
+                parto = f_fin * sxf
+                raton = math.floor(parto * (pct_raton / 100))
+                quedan = parto - raton
+                germinan = math.floor(quedan * (pct_germ / 100))
+                sobreviven = math.floor(germinan * (pct_plant / 100))
+                
+                resultados_sobreviven.append(sobreviven)
+                
+                # Se actualizará para mostrar el detalle de la última tirada procesada
+                texto_detalle = f"""
+                    <h3 style="margin-top: 0;">Tirada # {i+1}</h3>
+                    <p style="margin: 5px 0;">Frutos iniciales: {f_ini}</p>
+                    <p style="margin: 5px 0;">Frutos comidos: {f_com}</p>
+                    <p style="margin: 5px 0;">Frutos finales: {f_fin}</p>
+                    <p style="margin: 5px 0;">Semillas por fruto: {sxf}</p>
+                    <p style="margin: 5px 0;">Parto de {parto} semillas</p>
+                    <p style="margin: 5px 0;">Ratón se come el {pct_raton}% = {raton} semillas</p>
+                    <p style="margin: 5px 0;">Quedan {quedan} semillas</p>
+                    <p style="margin: 5px 0;">Germina el {pct_germ}% = {germinan} semillas</p>
+                    <p style="margin: 5px 0;">Sobrevive el {pct_plant}% = {sobreviven}</p>
+                """
+                
+            # Mostrar la tarjeta de detalle
+            document.querySelector("#resultadoTirada").innerHTML = texto_detalle
+            document.querySelector("#resultadoTirada").style.display = "block"
+            
+            # Cálculos Estadísticos
+            n = len(resultados_sobreviven)
+            prom = statistics.mean(resultados_sobreviven)
+            var = statistics.variance(resultados_sobreviven) if n > 1 else 0
+            desv = statistics.stdev(resultados_sobreviven) if n > 1 else 0
+            err = desv / math.sqrt(n) if n > 0 else 0
+            r_min = min(resultados_sobreviven)
+            r_max = max(resultados_sobreviven)
+            
+            stats_html = f"""
+                <p style="margin: 5px 0;">Promedio = {prom:.2f}</p>
+                <p style="margin: 5px 0;">Varianza = {var:.2f}</p>
+                <p style="margin: 5px 0;">Desviación estandar = {desv:.2f}</p>
+                <p style="margin: 5px 0;">Error estandar = {err:.2f}</p>
+                <p style="margin: 5px 0;">Rango = {r_min:.2f} &lt;-------&gt; {r_max:.2f}</p>
+            """
+            document.querySelector("#estadisticas").innerHTML = stats_html
+            document.querySelector("#estadisticas").style.display = "block"
+
+        # Conectar los eventos de click en HTML con las funciones de Python
+        document.querySelector("#radio-propios").addEventListener("change", alternar_menu)
+        document.querySelector("#radio-prueba").addEventListener("change", alternar_menu)
+        document.querySelector("#btn-generar").addEventListener("click", generar_tabla_propios)
+        document.querySelector("#btn-tirada").addEventListener("click", realizar_tiradas)
+
+        # Carga inicial de la tabla por defecto
+        renderizar_tabla()
+    </script>
+</body>
+</html>
